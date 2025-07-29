@@ -15,6 +15,10 @@
 
 ESP32와 PortOne의 결제 시스템을 활용하여 전기 도둑을 원천적으로 방지하는 시스템을 제작하였습니다.
 
+# 동작
+
+[![Video Label](http://img.youtube.com/vi/M93eWmQG_tY/0.jpg)](https://youtu.be/M93eWmQG_tY)
+
 # 개발 기간
 
 2025.07.21 ~ 2025.07.31 (2주)
