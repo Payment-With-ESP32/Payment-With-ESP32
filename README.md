@@ -130,6 +130,42 @@ ESP32와 PortOne의 결제 시스템을 활용하여 전기 도둑을 원천적�
 
 # 트러블 슈팅
 
+## Spring Boot의 정적 웹 페이지 배포
+
+> [Baeldung](https://www.baeldung.com/spring-mvc-static-resources), [Spring Doc](https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-config/static-resources.html)를 참고하였습니다.
+
+별도의 프록시 서버를 사용하지 않기 위해 내장 tomcat을 활용하여 정적 파일 배포를 진행하고자 하였습니다. 물론 Nginx를 사용하여 정적 파일 서빙을 하면 좋겠지만, 최대한 낮은 성능의 시스템을 구성하고자 하였기에 java + spring boot만 사용하는 것을 목표로 잡았습니다.
+
+아래는 `root` path로 들어오는 모든 요청에 대해 "이 파일을 제공하겠다"는 의미입니다. 여기서 없으면 controller로 넘어가게 되죠. 이는 효율적인 정적 파일 서빙을 위한 설계 방식입니다.
+
+```kotlin
+@Configuration
+class WebConfig: WebMvcConfigurer {
+    override fun addResourceHandlers(registry: ResourceHandlerRegistry) {
+        registry.addResourceHandler("/**")
+            .addResourceLocations("file:./frontend/", "file:./uploads")
+    }
+}
+```
+
+만약 존재하지 않는다면 controller를 찾게 됩니다. 아래의 코드는 **없는 모든 request 경로**에 대해 `/error` 경로로 요청을 넘기고, 이는 `/index.html` 파일로 포워딩 합니다.
+
+```kotlin
+@Controller
+class FrontendServeController: ErrorController {
+    companion object {
+        const val PATH = "/error"
+    }
+
+    @RequestMapping(PATH)
+    fun handleError(): String = "forward:/index.html"
+
+    fun getErrorPath(): String = PATH
+}
+```
+
+만약 이 로직이 없다면 특정 경로에 대해서만 "index.html"을 반환합니다. 그렇게 되면 whitelabel error page가 출력되는데, 이걸 핸들링 하기에는 과하다 생각하였습니다. 없으면 메인페이지로 보내면 되지 뭘 굳이 에러 핸들링을 해..?
+
 ## ESP32의 ESP-NOW가 되지 않는 현상
 
 ESPXX 시리즈는 ESP-NOW를 통해 N:M 통신이 가능합니다. 이를 활용하기 위해 ESP 시리즈 중 매우 작은 `ESP32-C3` 모듈을 구매하였습니다.
@@ -144,6 +180,30 @@ ESPXX 시리즈는 ESP-NOW를 통해 N:M 통신이 가능합니다. 이를 활�
 저 부분에 안테나가 프린팅 되어 있기 때문에 브레드보드에 꽉 끼운 상태로는 신호가 약해지는 것이 원인이었습니다.
 
 L자 GPIO 연장 커넥터를 주문하였고, 이를 통해 이 문제를 해결하였습니다.
+
+### 안테나 위치와는 별개로...
+
+> **`원천적으로 해결이 불가능하다`**라는 결론을 내렸습니다.
+
+가금 ESP32가 이벤트를 수신하지만 송신하지 못하는 상황이 생겼습니다. 재부팅으로 해결되는 경우가 있지만, 그렇지 않은 경우도 생겼습니다.
+
+발생 가능한 원인을 몇 가지 추려보았습니다.
+
+1. 브레드보드와 너무 가까이 있음
+
+이는 이 섹션의 부모 섹션을 참고 바랍니다. 이 ESP32-C3 모듈은 안테나가 내장되어있고 안테나가 매우 작다보니 간섭에 매우 취약합니다. [공식 문서](https://espressif.github.io/esp32-c3-book-en/chapter_5/5.3/5.3.4.html?utm_source=chatgpt.com)에서는 이 안테나 영역에 웬만하면 **어느 회로** 및 **어느 금속**도 존재해서는 안된다고 정의하고 있습니다.
+
+2. 전원이 정상적으로 공급되고 있는가?
+
+usb 전원을 쓴다면 문제 없지만, 점퍼 케이블 + 브레드보드를 사용하여 구성하는 경우 점퍼 케이블이 헐겁게 연결될 수 있는 상황이 존재합니다. 따라서 제대로 연결되어 있는지 확인해 봅시다.
+
+또한 5v 전원을 입력하는 것을 추천합니다. 브레드보드 전원 공급기는 3.3V 출력에 250mA를 공급하는 경우가 많습니다. 따라서 가끔 피크 전력을 찍는 경우 재부팅되면서 수신까지 되지 않을 수 있는 가능성이 있습니다.
+
+3. 같은 MAC으로 peer 등록을 여러 번 하고 있진 않는가?
+
+peer 등록은 비동기적으로 일어납니다. 같은 MAC을 여러 번 등록 시 첫 한 번만 등록이 일어나고 나머지는 ESP_ERROR를 반환합니다. 하지만, 비동기로 일어나다보니 동시에 같은 곳에 쓸 수 있는 가능성이 존재합니다. 이때 시스템이 과부하되고 재부팅 또는 비정상적인 init이 될 수 있는 가능성이 존재합니다.
+
+따라서 MAC 등록 시 처음 등록 시 master mac을 동록하든, insert queue를 만들어 MAC을 집어넣든, **단 한번**만 등록이 될 수 있게 처리하는 것이 좋습니다.
 
 ## Konva의 웹과 모바일 웹에서의 동작 차이
 
