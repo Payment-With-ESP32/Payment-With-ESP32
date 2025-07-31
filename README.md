@@ -96,6 +96,14 @@ ESP32와 PortOne의 결제 시스템을 활용하여 전기 도둑을 원천적�
 	└─ canvas의 배경 이미지들
 ```
 
+## ENV
+
+```
+PORTONE_API_V2_SECRET={{ PortOne V2 API Secret}}
+UART_BAUD_RATE={{ esp32의 baud rate }}
+UART_PORT={{ uart와 연결된 포트 }}
+```
+
 ## 페이지 구조
 
 관리 페이지, 결제 페이지, qr 생성 페이지로 구성됩니다.
